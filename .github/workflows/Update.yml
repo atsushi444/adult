@@ -21,11 +21,11 @@ jobs:
     - name: Update
       run: |
         # 获取源
-        rm -f Adult.m3u && touch Adult.m3u
+        rm -f General.m3u && touch General.m3u
         wget https://raw.githubusercontent.com/atsushi444/iptv/refs/heads/main/adult.m3u -O Adult.m3u
         wget https://raw.githubusercontent.com/atsushi444/iptv/refs/heads/main/adult2.m3u -O Adult2.m3u 
         cat Adult.m3u >> General.m3u
-        cat Adult2 >> General.m3u
+        cat Adult2.m3u >> General.m3u
         sed -i '1i #EXTM3U' General.m3u
         sed -i '/^\s*$/d' General.m3u
 
