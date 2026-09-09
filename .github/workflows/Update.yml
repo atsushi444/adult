@@ -21,9 +21,9 @@ jobs:
     - name: Update
       run: |
         # 获取源
-        rm -f General.m3u && touch General.m3u
-        wget https://raw.githubusercontent.com/atsushi444/iptv/refs/heads/main/adult.m3u -O Adult.m3u
-        wget https://raw.githubusercontent.com/atsushi444/iptv/refs/heads/main/adult2.m3u -O Adult2.m3u 
+        # 下载 m3u 文件并保存
+        rm -f adult.m3u && wget https://raw.githubusercontent.com/atsushi444/iptv/refs/heads/main/adult.m3u -O Adult.m3u
+        rm -f adult2.m3u && wget https://raw.githubusercontent.com/atsushi444/iptv/refs/heads/main/adult2.m3u -O Adult2.m3u
         cat Adult.m3u >> General.m3u
         cat Adult2.m3u >> General.m3u
         sed -i '1i #EXTM3U' General.m3u
@@ -34,7 +34,9 @@ jobs:
         rm -f General.m3u && touch General.m3u
         cat General.m3u >> General.m3u
         sed -i '/#EXTM3U/d' General.m3u
+        # 在文件开头添加 #EXTM3U 头部
         sed -i '1i #EXTM3U' General.m3u
+        # 删除空行
         sed -i '/^\s*$/d' General.m3u
 
         # 更新时间
