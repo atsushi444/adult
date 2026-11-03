@@ -38,7 +38,7 @@ jobs:
           from urllib.parse import urlparse
 
           # ==================== 配置区 ====================
-          SOURCES_FILE   = "https://raw.githubusercontent.com/atsushi444/ttt/6ebc300361d6842dad9a2865adfc24a0ac5e5139/sources.txt"
+          SOURCES_FILE   = "https://raw.githubusercontent.com/atsushi444/ttt/refs/heads/main/sources.txt"
           PERSONAL_FILE  = "personal.m3u"
           OUTPUT_FILE    = "playlist.m3u"     
           DEAD_FILE      = "dead.m3u"         
