@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+import os
+import re
+import time
+import urllib.request
+import concurrent.futures
+from datetime import datetime, timezone
+from urllib.parse import urlparse
+
+# ==================== 配置区 ====================
+SOURCES_FILE   = "sources.txt"
+PERSONAL_FILE  = "personal.m3u"
+OUTPUT_FILE    = "playlist.m3u"      # 存活频道
+DEAD_FILE      = "dead.m3u"          # 死亡频道
+TIMEOUT        = 10
+MAX_WORKERS    = 30
+USER_AGENT     = "Mozilla/5.0 (compatible; IPTV-Merger/2.0)"
+# ===============================================
+
+def download(url: str) -> str:
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            return resp.read().decode("utf-8", errors="ignore")
+    except Exception as e:
+        print(f"[WARN] 下载失败 {url}: {e}")
+        return ""
+
+def parse_m3u(content: str, source_name: str = "") -> list[tuple[str, str]]:
+    entries = []
+    lines = content.strip().splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if line.startswith("#EXTINF"):
+            extinf = line
+            if source_name:
+                if 'group-title="' in extinf:
+                    extinf = re.sub(r'group-title="[^"]*"', f'group-title="{source_name}"', extinf)
+                else:
+                    extinf = extinf.replace("#EXTINF:", f'#EXTINF:-1 group-title="{source_name}",', 1)
+            i += 1
+            if i < len(lines) and not lines[i].startswith("#"):
+                url = lines[i].strip()
+                if url.startswith("http"):
+                    entries.append((extinf, url))
+        i += 1
+    return entries
+
+def is_alive(url: str) -> bool:
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "*/*",
+        "Connection": "close",
+    }
+    try:
+        req = urllib.request.Request(url, method="HEAD", headers=headers)
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            if 200 <= resp.getcode() < 400:
+                return True
+    except Exception:
+        pass
+
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            if not (200 <= resp.getcode() < 400):
+                return False
+            data = resp.read(2048)
+            text = data.decode("utf-8", errors="ignore").lower()
+            if any(x in text for x in ["#extm3u", "#ext-x-", "mpegurl", "application/vnd.apple.mpegurl"]):
+                return True
+            if data[:4] in (b'\x47', b'FLV\x01') or b'\x00\x00\x00\x01' in data[:20]:
+                return True
+            return True
+    except Exception:
+        return False
+
+def main():
+    seen = set()
+    candidates = []
+
+    # 个人频道
+    if os.path.exists(PERSONAL_FILE):
+        print(f"加载个人频道: {PERSONAL_FILE}")
+        with open(PERSONAL_FILE, encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+        for extinf, url in parse_m3u(content, "Personal"):
+            if url not in seen:
+                seen.add(url)
+                candidates.append((extinf, url))
+
+    # 远程源
+    sources = []
+    if os.path.exists(SOURCES_FILE):
+        with open(SOURCES_FILE, encoding="utf-8") as f:
+            sources = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+
+    for idx, src in enumerate(sources, 1):
+        print(f"[{idx}/{len(sources)}] 下载: {src}")
+        content = download(src)
+        if not content:
+            continue
+        try:
+            host = urlparse(src).netloc.split(":")[0] or f"Source-{idx}"
+        except Exception:
+            host = f"Source-{idx}"
+        for extinf, url in parse_m3u(content, host):
+            if url not in seen:
+                seen.add(url)
+                candidates.append((extinf, url))
+
+    total = len(candidates)
+    print(f"\n共收集到 {total} 个唯一频道，开始死链检测（并发 {MAX_WORKERS}）...\n")
+
+    alive = []
+    dead = []
+    start = time.time()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        future_to_item = {
+            executor.submit(is_alive, url): (extinf, url)
+            for extinf, url in candidates
+        }
+        done = 0
+        for future in concurrent.futures.as_completed(future_to_item):
+            done += 1
+            extinf, url = future_to_item[future]
+            try:
+                if future.result():
+                    alive.append((extinf, url))
+                else:
+                    dead.append((extinf, url))
+            except Exception:
+                dead.append((extinf, url))
+
+            if done % 50 == 0 or done == total:
+                print(f"进度: {done}/{total} | 存活: {len(alive)} | 死亡: {len(dead)}")
+
+    elapsed = time.time() - start
+    print(f"\n检测完成！用时 {elapsed:.1f}s")
+    print(f"结果: 总数 {total} → 存活 {len(alive)} | 死亡 {len(dead)}")
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    # 写出存活列表
+    header_alive = f"""#EXTM3U
+# Generated by GitHub Actions (alive only)
+# Updated: {now}
+# Total checked: {total} | Alive: {len(alive)} | Dead: {len(dead)}
+"""
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        f.write(header_alive)
+        for extinf, url in alive:
+            f.write(extinf + "\n")
+            f.write(url + "\n")
+    print(f"已写入存活列表: {OUTPUT_FILE}")
+
+    # 写出死亡列表
+    header_dead = f"""#EXTM3U
+# Generated by GitHub Actions (dead channels)
+# Updated: {now}
+# Total checked: {total} | Alive: {len(alive)} | Dead: {len(dead)}
+"""
+    with open(DEAD_FILE, "w", encoding="utf-8") as f:
+        f.write(header_dead)
+        for extinf, url in dead:
+            f.write(extinf + "\n")
+            f.write(url + "\n")
+    print(f"已写入死亡列表: {DEAD_FILE}")
+
+if __name__ == "__main__":
+    main()
