@@ -26,7 +26,7 @@ jobs:
           python-version: '3.11'
 
       - name: Run merge script
-        run: python3 merge_iptv.py
+        run: python3 scripts/merge_iptv.py
 
       - name: Commit and push if changed
         run: |
