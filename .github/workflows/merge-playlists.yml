@@ -4,10 +4,7 @@ on:
   schedule:
     # 每天北京时间 16:00（UTC 0:00）
     - cron: '0 8 * * *'
-  workflow_dispatch:   # 支持手动触发
-
-env:
-  TZ: Asia/Shanghai
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -28,12 +25,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Merge + Dead Link Check + Update README
+      - name: Create merge script
         run: |
-          python3 << 'EOF'
+          cat > merge_iptv.py << 'PYEOF'
           import urllib.request
           import concurrent.futures
           import time
+          import re
           from datetime import datetime, timezone, timedelta
           from pathlib import Path
 
@@ -164,7 +162,6 @@ jobs:
           print(f"Saved {len(dead_channels)} dead channels → {DEAD_FILE}")
 
           # ---------- 更新 README ----------
-          # 北京时间 = UTC+8
           beijing_tz = timezone(timedelta(hours=8))
           now_beijing = datetime.now(beijing_tz).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -182,19 +179,20 @@ jobs:
           readme_path = Path(README_FILE)
           if readme_path.exists():
               content = readme_path.read_text(encoding="utf-8")
-              import re
               pattern = r"<!-- IPTV-STATUS-START -->.*?<!-- IPTV-STATUS-END -->"
               if re.search(pattern, content, flags=re.DOTALL):
                   new_content = re.sub(pattern, status_block.strip(), content, flags=re.DOTALL)
               else:
-                  # 没有标记就插入到文件最前面
                   new_content = status_block + "\n" + content
           else:
               new_content = f"# IPTV Playlist Merger\n\n{status_block}"
 
           readme_path.write_text(new_content, encoding="utf-8")
           print(f"Updated {README_FILE} with latest status")
-          EOF
+          PYEOF
+
+      - name: Run merge script
+        run: python3 merge_iptv.py
 
       - name: Commit and push if changed
         run: |
