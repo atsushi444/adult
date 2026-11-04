@@ -1,4 +1,5 @@
 # 每行一个播放列表地址，支持注释
+https://raw.githubusercontent.com/atsushi444/iptv/refs/heads/main/adult2.m3u
 https://raw.githubusercontent.com/atsushi444/iptv/refs/heads/main/vod/list7.m3u
 https://raw.githubusercontent.com/atsushi444/iptv/refs/heads/main/vod/list4.m3u
 https://raw.githubusercontent.com/atsushi444/iptv/refs/heads/main/vod/list10.m3u
