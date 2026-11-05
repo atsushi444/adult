@@ -7,7 +7,6 @@ from pathlib import Path
 
 # ========== 配置 ==========
 SOURCES_FILE = "sources.txt"
-PERSONAL_FILE = "personal.m3u"
 OUTPUT_FILE = "playlist.m3u"
 DEAD_FILE = "dead.m3u"
 README_FILE = "README.md"
@@ -70,16 +69,7 @@ def main():
     all_channels = []
     seen_urls = set()
 
-    # 1. personal.m3u 优先
-    if Path(PERSONAL_FILE).exists():
-        print(f"Loading personal: {PERSONAL_FILE}")
-        content = Path(PERSONAL_FILE).read_text(encoding="utf-8", errors="ignore")
-        for extinf, url in parse_m3u(content):
-            if url not in seen_urls:
-                seen_urls.add(url)
-                all_channels.append((extinf, url))
-
-    # 2. 从 sources.txt 下载
+    # 1. 从 sources.txt 下载
     if Path(SOURCES_FILE).exists():
         with open(SOURCES_FILE, encoding="utf-8") as f:
             sources = [line.strip() for line in f if line.strip() and not line.startswith("#")]
@@ -98,7 +88,7 @@ def main():
 
     print(f"\nTotal unique channels before check: {len(all_channels)}")
 
-    # 3. 死链检测
+    # 2. 死链检测
     print(f"Starting dead-link check (timeout={TIMEOUT}s, workers={MAX_WORKERS})...")
     start = time.time()
 
@@ -122,7 +112,7 @@ def main():
     print(f"Check finished in {elapsed:.1f}s")
     print(f"Alive: {len(alive_channels)} | Dead: {len(dead_channels)}")
 
-    # 4. 写出文件
+    # 3. 写出文件
     header = "#EXTM3U\n"
     Path(OUTPUT_FILE).write_text(
         header + "\n".join(f"{e}\n{u}" for e, u in alive_channels) + "\n",
@@ -136,7 +126,7 @@ def main():
     )
     print(f"Saved {len(dead_channels)} dead channels → {DEAD_FILE}")
 
-    # 5. 更新 README
+    # 4. 更新 README
     beijing_tz = timezone(timedelta(hours=8))
     now_beijing = datetime.now(beijing_tz).strftime("%Y-%m-%d %H:%M:%S")
 
