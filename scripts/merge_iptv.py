@@ -42,6 +42,14 @@ def parse_m3u(content: str):
     return channels
 
 def is_alive(url: str) -> bool:
+    # 跳过这些域名，直接视为存活
+    SKIP_DOMAINS = [
+        "https://t33.cdn2020.com",
+    ]
+
+    if any(url.startswith(domain) for domain in SKIP_DOMAINS):
+        return True
+
     headers = {
         "User-Agent": "Mozilla/5.0 (compatible; IPTV-Checker/1.2)",
         "Accept": "*/*",
