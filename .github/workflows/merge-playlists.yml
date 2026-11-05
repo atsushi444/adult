@@ -1,10 +1,13 @@
 name: Merge IPTV Playlists
 
 on:
+  push:
   schedule:
-    # 每天北京时间 16:00（UTC 0:00）
     - cron: '0 8 * * *'
   workflow_dispatch:
+  
+env:
+  TZ: Asia/Shanghai
 
 permissions:
   contents: write
